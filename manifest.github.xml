@@ -12,16 +12,16 @@
   <DefaultLocale>en-US</DefaultLocale>
   <DisplayName DefaultValue="Markdown for Word"/>
   <Description DefaultValue="Convert Word documents to Markdown and insert Markdown as formatted Word content."/>
-  <IconUrl DefaultValue="https://gfoust69.github.io/word-markdown-addin/assets/icon-32.png"/>
-  <HighResolutionIconUrl DefaultValue="https://gfoust69.github.io/word-markdown-addin/assets/icon-80.png"/>
-  <SupportUrl DefaultValue="https://gfoust69.github.io/word-markdown-addin"/>
+  <IconUrl DefaultValue="https://foust-family.github.io/word-markdown-addin/assets/icon-32.png"/>
+  <HighResolutionIconUrl DefaultValue="https://foust-family.github.io/word-markdown-addin/assets/icon-80.png"/>
+  <SupportUrl DefaultValue="https://foust-family.github.io/word-markdown-addin"/>
 
   <Hosts>
     <Host Name="Document"/>
   </Hosts>
 
   <DefaultSettings>
-    <SourceLocation DefaultValue="https://gfoust69.github.io/word-markdown-addin/taskpane.html"/>
+    <SourceLocation DefaultValue="https://foust-family.github.io/word-markdown-addin/taskpane.html"/>
   </DefaultSettings>
 
   <Permissions>ReadWriteDocument</Permissions>
@@ -69,13 +69,13 @@
 
     <Resources>
       <bt:Images>
-        <bt:Image id="Icon.16" DefaultValue="https://gfoust69.github.io/word-markdown-addin/assets/icon-16.png"/>
-        <bt:Image id="Icon.32" DefaultValue="https://gfoust69.github.io/word-markdown-addin/assets/icon-32.png"/>
-        <bt:Image id="Icon.80" DefaultValue="https://gfoust69.github.io/word-markdown-addin/assets/icon-80.png"/>
+        <bt:Image id="Icon.16" DefaultValue="https://foust-family.github.io/word-markdown-addin/assets/icon-16.png"/>
+        <bt:Image id="Icon.32" DefaultValue="https://foust-family.github.io/word-markdown-addin/assets/icon-32.png"/>
+        <bt:Image id="Icon.80" DefaultValue="https://foust-family.github.io/word-markdown-addin/assets/icon-80.png"/>
       </bt:Images>
       <bt:Urls>
-        <bt:Url id="GetStarted.LearnMoreUrl" DefaultValue="https://gfoust69.github.io/word-markdown-addin"/>
-        <bt:Url id="TaskPane.Url" DefaultValue="https://gfoust69.github.io/word-markdown-addin/taskpane.html"/>
+        <bt:Url id="GetStarted.LearnMoreUrl" DefaultValue="https://foust-family.github.io/word-markdown-addin"/>
+        <bt:Url id="TaskPane.Url" DefaultValue="https://foust-family.github.io/word-markdown-addin/taskpane.html"/>
       </bt:Urls>
       <bt:ShortStrings>
         <bt:String id="GetStarted.Title" DefaultValue="Markdown for Word is ready"/>
