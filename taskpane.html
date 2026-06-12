@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Markdown for Word</title>
+
+<!-- Office.js (required for all Office add-ins) -->
+<script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+<!-- marked: Markdown -> HTML -->
+<script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+<!-- turndown: HTML -> Markdown -->
+<script src="https://cdn.jsdelivr.net/npm/turndown@7.1.3/dist/turndown.js"></script>
+<!-- turndown GFM plugin: tables, strikethrough -->
+<script src="https://cdn.jsdelivr.net/npm/turndown-plugin-gfm@1.0.2/dist/turndown-plugin-gfm.js"></script>
+<!-- JSZip: bundle Markdown + extracted images into one download -->
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<!-- MSAL: Microsoft sign-in for the Save to OneDrive feature -->
+<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.1/lib/msal-browser.min.js"></script>
+
+<style>
+  :root {
+    --brand: #2b579a;
+    --border: #d1d1d1;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Segoe UI", system-ui, sans-serif;
+    margin: 0;
+    padding: 12px;
+    font-size: 13px;
+    color: #242424;
+  }
+  h2 { font-size: 15px; margin: 0 0 10px; color: var(--brand); }
+  .tabs { display: flex; gap: 4px; margin-bottom: 10px; }
+  .tabs button {
+    flex: 1; padding: 6px 4px; border: 1px solid var(--border);
+    background: #f5f5f5; cursor: pointer; border-radius: 4px; font-size: 12px;
+  }
+  .tabs button.active { background: var(--brand); color: #fff; border-color: var(--brand); }
+  .panel { display: none; }
+  .panel.active { display: block; }
+  textarea {
+    width: 100%; height: 220px; font-family: Consolas, monospace; font-size: 12px;
+    border: 1px solid var(--border); border-radius: 4px; padding: 8px; resize: vertical;
+  }
+  .actions { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .actions button {
+    padding: 7px 12px; border: none; border-radius: 4px; cursor: pointer;
+    background: var(--brand); color: #fff; font-size: 12px;
+  }
+  .actions button.secondary { background: #e6e6e6; color: #242424; }
+  .actions button:disabled { opacity: 0.5; cursor: default; }
+  #status { margin-top: 8px; font-size: 12px; min-height: 16px; }
+  #status.ok { color: #107c10; }
+  #status.err { color: #a4262c; }
+  #preview {
+    border: 1px solid var(--border); border-radius: 4px; padding: 10px;
+    min-height: 220px; max-height: 400px; overflow: auto; background: #fafafa;
+  }
+  #preview table { border-collapse: collapse; }
+  #preview th, #preview td { border: 1px solid #ccc; padding: 4px 8px; }
+  #preview code { background: #eee; padding: 1px 4px; border-radius: 3px; }
+  #preview pre { background: #eee; padding: 8px; border-radius: 4px; overflow: auto; }
+  label.check { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
+</style>
+</head>
+<body>
+
+<h2>Markdown for Word</h2>
+
+<div class="tabs">
+  <button id="tab-export" class="active">Export to MD</button>
+  <button id="tab-insert">Insert MD</button>
+  <button id="tab-preview">Preview</button>
+</div>
+
+<!-- ===== Export: Word -> Markdown ===== -->
+<div id="panel-export" class="panel active">
+  <p>Convert this document (or your selection) to Markdown.</p>
+  <div class="actions">
+    <button id="btn-export-doc">Convert document</button>
+    <button id="btn-export-sel" class="secondary">Convert selection</button>
+  </div>
+  <textarea id="export-output" placeholder="Markdown output appears here..." spellcheck="false"></textarea>
+  <div id="image-info" style="margin-top:6px; font-size:12px; color:#555;"></div>
+  <div class="actions">
+    <button id="btn-copy" class="secondary">Copy to clipboard</button>
+    <button id="btn-download" class="secondary">Download .md</button>
+    <button id="btn-download-zip" class="secondary" disabled>Download .zip (md + images)</button>
+  </div>
+  <div class="actions" style="align-items:center; margin-top:10px; border-top:1px solid var(--border); padding-top:10px;">
+    <input id="onedrive-name" type="text" value="document"
+           style="flex:1; min-width:90px; padding:6px 8px; border:1px solid var(--border); border-radius:4px; font-size:12px;"
+           aria-label="File name"/>
+    <span style="font-size:12px; color:#555;">.md</span>
+    <button id="btn-onedrive">Save to OneDrive</button>
+  </div>
+</div>
+
+<!-- ===== Insert: Markdown -> Word ===== -->
+<div id="panel-insert" class="panel">
+  <p>Paste Markdown below and insert it as formatted Word content. Image links (<code>![alt](url)</code>) are downloaded and embedded automatically.</p>
+  <textarea id="insert-input" placeholder="# Heading&#10;&#10;Some **bold** text, a [link](https://example.com), and:&#10;&#10;- a list&#10;- of items" spellcheck="false"></textarea>
+  <label class="check">
+    <input type="checkbox" id="insert-at-end"/> Insert at end of document (instead of at cursor)
+  </label>
+  <div class="actions">
+    <button id="btn-insert">Insert into document</button>
+  </div>
+</div>
+
+<!-- ===== Preview: live Markdown view of the document ===== -->
+<div id="panel-preview" class="panel">
+  <p>Rendered preview of the document's Markdown round-trip.</p>
+  <div class="actions">
+    <button id="btn-refresh" class="secondary">Refresh preview</button>
+  </div>
+  <div id="preview"></div>
+</div>
+
+<div id="status"></div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ===== OneDrive configuration =====
+  // Paste the Application (client) ID from your Entra ID app registration
+  // here. See README, section "Save to OneDrive setup". Until this is set,
+  // the Save to OneDrive button explains what to do instead of uploading.
+  var GRAPH_CLIENT_ID = "";
+
+  let turndown;
+  // Images pulled out of the last export: [{ name, base64 }]
+  let extractedImages = [];
+  let msalApp = null;
+
+  Office.onReady(function (info) {
+    if (info.host !== Office.HostType.Word) {
+      setStatus("This add-in only works in Word.", true);
+      return;
+    }
+
+    turndown = new TurndownService({
+      headingStyle: "atx",
+      codeBlockStyle: "fenced",
+      bulletListMarker: "-"
+    });
+    // GFM plugin adds table + strikethrough support
+    turndown.use(turndownPluginGfm.gfm);
+
+    wireUp();
+    setStatus("Ready.", false);
+  });
+
+  function wireUp() {
+    var tabs = ["export", "insert", "preview"];
+    tabs.forEach(function (name) {
+      document.getElementById("tab-" + name).addEventListener("click", function () {
+        tabs.forEach(function (t) {
+          document.getElementById("tab-" + t).classList.toggle("active", t === name);
+          document.getElementById("panel-" + t).classList.toggle("active", t === name);
+        });
+      });
+    });
+
+    document.getElementById("btn-export-doc").addEventListener("click", function () { exportToMarkdown(false); });
+    document.getElementById("btn-export-sel").addEventListener("click", function () { exportToMarkdown(true); });
+    document.getElementById("btn-copy").addEventListener("click", copyMarkdown);
+    document.getElementById("btn-download").addEventListener("click", downloadMarkdown);
+    document.getElementById("btn-download-zip").addEventListener("click", downloadZip);
+    document.getElementById("btn-onedrive").addEventListener("click", saveToOneDrive);
+    document.getElementById("btn-insert").addEventListener("click", insertMarkdown);
+    document.getElementById("btn-refresh").addEventListener("click", refreshPreview);
+  }
+
+  // ---------- Word -> Markdown ----------
+
+  function getDocumentHtml(selectionOnly) {
+    return Word.run(function (context) {
+      var range = selectionOnly
+        ? context.document.getSelection()
+        : context.document.body.getRange();
+      var htmlResult = range.getHtml();
+      return context.sync().then(function () {
+        return htmlResult.value;
+      });
+    });
+  }
+
+  function htmlToMarkdown(html) {
+    // Word emits a full HTML document with mso-* styles; parse it and
+    // hand only the <body> to turndown so head/style content is dropped.
+    var doc = new DOMParser().parseFromString(html, "text/html");
+    cleanWordHtml(doc.body);
+    extractImages(doc.body);
+    var md = turndown.turndown(doc.body.innerHTML);
+    // Collapse the 3+ blank lines Word's nested divs tend to produce
+    return md.replace(/\n{3,}/g, "\n\n").trim() + "\n";
+  }
+
+  function extractImages(root) {
+    // Word's getHtml() embeds pictures as base64 data URIs. Pull each one
+    // out as its own file and rewrite the src to a relative path, so the
+    // exported Markdown looks like ![alt](images/image-1.png).
+    extractedImages = [];
+    var imgs = root.querySelectorAll("img");
+    var counter = 0;
+    imgs.forEach(function (img) {
+      var src = img.getAttribute("src") || "";
+      var match = src.match(/^data:image\/([a-zA-Z0-9.+-]+);base64,(.+)$/);
+      if (!match) return; // external URL — leave the link as-is
+      counter++;
+      var ext = match[1].toLowerCase();
+      if (ext === "jpeg") ext = "jpg";
+      if (ext === "x-emf" || ext === "x-wmf") ext = "png"; // rare vector formats; name as png so it still opens somewhere
+      var name = "images/image-" + counter + "." + ext;
+      extractedImages.push({ name: name, base64: match[2] });
+      img.setAttribute("src", name);
+      if (!img.getAttribute("alt")) img.setAttribute("alt", "image " + counter);
+    });
+  }
+
+  function updateImageInfo() {
+    var info = document.getElementById("image-info");
+    var zipBtn = document.getElementById("btn-download-zip");
+    if (extractedImages.length > 0) {
+      info.textContent = extractedImages.length + " image" +
+        (extractedImages.length === 1 ? "" : "s") +
+        " extracted — use the zip download to get them alongside the Markdown.";
+      zipBtn.disabled = false;
+    } else {
+      info.textContent = "";
+      zipBtn.disabled = true;
+    }
+  }
+
+  function cleanWordHtml(root) {
+    // Word marks list paragraphs as <p class="MsoListParagraph"> instead of
+    // real <ul>/<ol>. Turndown handles genuine lists; for the common export
+    // path (getHtml) Word DOES emit real list tags, so we only need to strip
+    // noise: comments, smart-tag remnants, and empty spans.
+    var walker = document.createTreeWalker(root, NodeFilter.SHOW_COMMENT, null);
+    var comments = [];
+    while (walker.nextNode()) comments.push(walker.currentNode);
+    comments.forEach(function (c) { c.remove(); });
+
+    root.querySelectorAll("o\\:p, w\\:sdt, style, script").forEach(function (el) { el.remove(); });
+  }
+
+  function exportToMarkdown(selectionOnly) {
+    setStatus("Converting...", false);
+    getDocumentHtml(selectionOnly)
+      .then(function (html) {
+        var md = htmlToMarkdown(html);
+        document.getElementById("export-output").value = md;
+        updateImageInfo();
+        setStatus("Converted " + (selectionOnly ? "selection" : "document") + " to Markdown.", false);
+      })
+      .catch(handleError);
+  }
+
+  function downloadZip() {
+    var text = document.getElementById("export-output").value;
+    if (!text) { setStatus("Nothing to download — convert first.", true); return; }
+    var zip = new JSZip();
+    zip.file("document.md", text);
+    extractedImages.forEach(function (img) {
+      zip.file(img.name, img.base64, { base64: true });
+    });
+    zip.generateAsync({ type: "blob" }).then(function (blob) {
+      var a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "document-md.zip";
+      a.click();
+      URL.revokeObjectURL(a.href);
+      setStatus("Downloaded document-md.zip (" + extractedImages.length + " images).", false);
+    });
+  }
+
+  function copyMarkdown() {
+    var ta = document.getElementById("export-output");
+    if (!ta.value) { setStatus("Nothing to copy — convert first.", true); return; }
+    ta.select();
+    // execCommand still works in add-in webviews where the async Clipboard
+    // API may be blocked by permissions policy.
+    var ok = document.execCommand("copy");
+    if (!ok && navigator.clipboard) {
+      navigator.clipboard.writeText(ta.value).then(
+        function () { setStatus("Copied to clipboard.", false); },
+        function () { setStatus("Copy failed — select the text and press Ctrl+C.", true); }
+      );
+      return;
+    }
+    setStatus(ok ? "Copied to clipboard." : "Copy failed — select the text and press Ctrl+C.", !ok);
+  }
+
+  function downloadMarkdown() {
+    var text = document.getElementById("export-output").value;
+    if (!text) { setStatus("Nothing to download — convert first.", true); return; }
+    var blob = new Blob([text], { type: "text/markdown;charset=utf-8" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "document.md";
+    a.click();
+    URL.revokeObjectURL(a.href);
+    setStatus("Downloaded document.md.", false);
+  }
+
+  // ---------- Save to OneDrive ----------
+
+  function ensureMsal() {
+    if (!GRAPH_CLIENT_ID) {
+      setStatus("OneDrive isn't set up yet — paste your app's client ID into GRAPH_CLIENT_ID at the top of taskpane.html (see README).", true);
+      return Promise.reject(new Error("not configured"));
+    }
+    if (msalApp) return Promise.resolve(msalApp);
+    // Nested App Authentication: the recommended sign-in flow for Office
+    // add-ins. Falls back to a popup automatically where NAA is unavailable.
+    return msal.createNestablePublicClientApplication({
+      auth: {
+        clientId: GRAPH_CLIENT_ID,
+        authority: "https://login.microsoftonline.com/common"
+      }
+    }).then(function (app) {
+      msalApp = app;
+      return app;
+    });
+  }
+
+  function getGraphToken() {
+    var request = { scopes: ["Files.ReadWrite"] };
+    return ensureMsal().then(function (app) {
+      var account = app.getActiveAccount() || app.getAllAccounts()[0];
+      if (account) request.account = account;
+      return app.acquireTokenSilent(request)
+        .catch(function () { return app.acquireTokenPopup(request); })
+        .then(function (result) {
+          app.setActiveAccount(result.account);
+          return result.accessToken;
+        });
+    });
+  }
+
+  function saveToOneDrive() {
+    var text = document.getElementById("export-output").value;
+    if (!text) { setStatus("Nothing to save — convert first.", true); return; }
+
+    var name = document.getElementById("onedrive-name").value.trim()
+      .replace(/\.md$/i, "")
+      .replace(/[\\/:*?"<>|#%]/g, "-");
+    if (!name) name = "document";
+
+    var hasImages = extractedImages.length > 0;
+    var btn = document.getElementById("btn-onedrive");
+    btn.disabled = true;
+    setStatus("Signing in...", false);
+
+    getGraphToken().then(function (token) {
+      setStatus("Uploading to OneDrive...", false);
+      var chain;
+      var basePath;
+      if (hasImages) {
+        // Markdown links use relative paths (images/...), so keep the .md
+        // and its images together in a folder named after the file.
+        basePath = name + "/";
+        chain = ensureFolder(token, "", name)
+          .then(function () { return ensureFolder(token, name, "images"); });
+      } else {
+        basePath = "";
+        chain = Promise.resolve();
+      }
+      return chain.then(function () {
+        var uploads = [
+          putFile(token, basePath + name + ".md", text, "text/markdown")
+        ];
+        extractedImages.forEach(function (img) {
+          var ext = img.name.split(".").pop();
+          uploads.push(putFile(
+            token,
+            basePath + img.name,
+            base64ToBlob(img.base64, "image/" + (ext === "jpg" ? "jpeg" : ext)),
+            null
+          ));
+        });
+        return Promise.all(uploads);
+      }).then(function (results) {
+        var webUrl = results[0] && results[0].webUrl;
+        var msg = "Saved " + name + ".md to OneDrive" +
+          (hasImages ? " (folder \"" + name + "\" with " + extractedImages.length + " images)." : ".");
+        setStatus(msg, false);
+        if (webUrl) {
+          var info = document.getElementById("image-info");
+          info.innerHTML = "";
+          var a = document.createElement("a");
+          a.href = webUrl;
+          a.target = "_blank";
+          a.rel = "noopener";
+          a.textContent = "Open " + name + ".md in OneDrive";
+          info.appendChild(a);
+        }
+      });
+    }).catch(function (err) {
+      if (err && err.message === "not configured") return; // status already set
+      if (err && err.errorCode === "user_cancelled") {
+        setStatus("Sign-in was cancelled.", true);
+        return;
+      }
+      handleError(err);
+    }).finally(function () {
+      btn.disabled = false;
+    });
+  }
+
+  function ensureFolder(token, parentPath, folderName) {
+    var url = "https://graph.microsoft.com/v1.0/me/drive/root" +
+      (parentPath ? ":/" + encodePath(parentPath) + ":" : "") + "/children";
+    return fetch(url, {
+      method: "POST",
+      headers: {
+        "Authorization": "Bearer " + token,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        name: folderName,
+        folder: {},
+        "@microsoft.graph.conflictBehavior": "fail"
+      })
+    }).then(function (resp) {
+      // 409 = folder already exists, which is fine
+      if (!resp.ok && resp.status !== 409) {
+        throw new Error("Couldn't create the OneDrive folder (HTTP " + resp.status + ").");
+      }
+    });
+  }
+
+  function putFile(token, path, body, contentType) {
+    var headers = { "Authorization": "Bearer " + token };
+    if (contentType) headers["Content-Type"] = contentType;
+    return fetch(
+      "https://graph.microsoft.com/v1.0/me/drive/root:/" + encodePath(path) + ":/content",
+      { method: "PUT", headers: headers, body: body }
+    ).then(function (resp) {
+      if (!resp.ok) throw new Error("Upload of " + path + " failed (HTTP " + resp.status + ").");
+      return resp.json();
+    });
+  }
+
+  function encodePath(path) {
+    return path.split("/").map(encodeURIComponent).join("/");
+  }
+
+  function base64ToBlob(b64, mime) {
+    var bytes = atob(b64);
+    var arr = new Uint8Array(bytes.length);
+    for (var i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
+    return new Blob([arr], { type: mime });
+  }
+
+  // ---------- Markdown -> Word ----------
+
+  function insertMarkdown() {
+    var md = document.getElementById("insert-input").value;
+    if (!md.trim()) { setStatus("Enter some Markdown first.", true); return; }
+    var atEnd = document.getElementById("insert-at-end").checked;
+    var html = marked.parse(md);
+
+    setStatus("Downloading images...", false);
+    embedRemoteImages(html).then(function (result) {
+      setStatus("Inserting...", false);
+      return Word.run(function (context) {
+        var target = atEnd
+          ? context.document.body
+          : context.document.getSelection();
+        var location = atEnd ? Word.InsertLocation.end : Word.InsertLocation.replace;
+        target.insertHtml(result.html, location);
+        return context.sync();
+      }).then(function () {
+        var msg = "Inserted formatted content.";
+        if (result.embedded > 0) {
+          msg += " " + result.embedded + " image" + (result.embedded === 1 ? "" : "s") + " embedded.";
+        }
+        if (result.failed.length > 0) {
+          msg += " " + result.failed.length + " image" + (result.failed.length === 1 ? "" : "s") +
+            " couldn't be downloaded and " + (result.failed.length === 1 ? "was" : "were") + " left as a link.";
+        }
+        setStatus(msg, result.failed.length > 0);
+      });
+    }).catch(handleError);
+  }
+
+  function embedRemoteImages(html) {
+    // Fetch each http(s) image referenced in the Markdown and inline it as
+    // a base64 data URI, so the picture is embedded in the document rather
+    // than linked. Downloads that fail (offline host, CORS-restricted
+    // server) keep their original URL — Word will still try to resolve it.
+    var doc = new DOMParser().parseFromString(html, "text/html");
+    var imgs = Array.prototype.slice.call(doc.body.querySelectorAll("img"));
+    var failed = [];
+    var embedded = 0;
+
+    var jobs = imgs.map(function (img) {
+      var src = img.getAttribute("src") || "";
+      if (!/^https?:\/\//i.test(src)) return Promise.resolve();
+      return fetch(src)
+        .then(function (resp) {
+          if (!resp.ok) throw new Error("HTTP " + resp.status);
+          return resp.blob();
+        })
+        .then(function (blob) {
+          if (blob.type.indexOf("image/") !== 0) throw new Error("not an image");
+          return blobToDataUri(blob);
+        })
+        .then(function (dataUri) {
+          img.setAttribute("src", dataUri);
+          embedded++;
+        })
+        .catch(function () {
+          failed.push(src);
+        });
+    });
+
+    return Promise.all(jobs).then(function () {
+      return { html: doc.body.innerHTML, embedded: embedded, failed: failed };
+    });
+  }
+
+  function blobToDataUri(blob) {
+    return new Promise(function (resolve, reject) {
+      var reader = new FileReader();
+      reader.onload = function () { resolve(reader.result); };
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  // ---------- Preview ----------
+
+  function refreshPreview() {
+    setStatus("Rendering preview...", false);
+    getDocumentHtml(false)
+      .then(function (html) {
+        var md = htmlToMarkdown(html);
+        var preview = document.getElementById("preview");
+        preview.innerHTML = marked.parse(md);
+        // Extraction rewrote img srcs to relative paths; swap the data
+        // URIs back in so pictures actually render in the preview.
+        var byName = {};
+        extractedImages.forEach(function (img) {
+          byName[img.name] = "data:image/" + img.name.split(".").pop() + ";base64," + img.base64;
+        });
+        preview.querySelectorAll("img").forEach(function (img) {
+          var src = img.getAttribute("src");
+          if (byName[src]) {
+            img.src = byName[src];
+            img.style.maxWidth = "100%";
+          }
+        });
+        setStatus("Preview updated.", false);
+      })
+      .catch(handleError);
+  }
+
+  // ---------- Helpers ----------
+
+  function setStatus(msg, isError) {
+    var el = document.getElementById("status");
+    el.textContent = msg;
+    el.className = isError ? "err" : "ok";
+  }
+
+  function handleError(error) {
+    setStatus("Error: " + (error.message || error), true);
+    if (error instanceof OfficeExtension.Error) {
+      console.error(error.debugInfo);
+    }
+  }
+})();
+</script>
+</body>
+</html>
