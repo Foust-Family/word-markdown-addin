@@ -154,4 +154,3 @@ through the **Office JavaScript API** (`office.js`):
 - **"OneDrive isn't set up yet"** → paste your client ID into `GRAPH_CLIENT_ID` in `taskpane.html` (see *Save to OneDrive setup*).
 - **Sign-in window never appears or closes instantly** → the redirect URIs in your app registration must exactly match where the add-in is hosted; re-check step 3 of the OneDrive setup.
 - **Upload fails with HTTP 403** → your account doesn't have the Files.ReadWrite permission consented; re-check step 4, or your admin may need to approve it.
-
